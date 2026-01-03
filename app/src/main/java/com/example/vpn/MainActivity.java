@@ -11,6 +11,10 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -28,16 +32,29 @@ import androidx.core.content.ContextCompat;
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_CODE_PHONE_STATE = 100;
-    private static final int REQUEST_CODE_VPN = 101;
     
     private Button btnRequestPermissions;
     private Button btnStartVpn;
     private TextView tvPermissionStatus;
     
+    // Modern ActivityResultLauncher for VPN permission
+    private ActivityResultLauncher<Intent> vpnPermissionLauncher;
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        
+        // Register ActivityResultLauncher for VPN permission
+        vpnPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            new ActivityResultCallback<ActivityResult>() {
+                @Override
+                public void onActivityResult(ActivityResult result) {
+                    handleVpnPermissionResult(result.getResultCode());
+                }
+            }
+        );
         
         // Initialize UI components
         btnRequestPermissions = findViewById(R.id.btn_request_permissions);
@@ -105,8 +122,8 @@ public class MainActivity extends AppCompatActivity {
         // Prepare VPN service
         Intent intent = VpnService.prepare(this);
         if (intent != null) {
-            // VPN permission not granted, request it
-            startActivityForResult(intent, REQUEST_CODE_VPN);
+            // VPN permission not granted, request it using modern API
+            vpnPermissionLauncher.launch(intent);
         } else {
             // VPN permission already granted
             Toast.makeText(this, "VPN permission already granted! Ready to connect.", 
@@ -145,21 +162,16 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Handle the result of VPN permission request
      */
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        
-        if (requestCode == REQUEST_CODE_VPN) {
-            if (resultCode == Activity.RESULT_OK) {
-                // VPN permission granted
-                Toast.makeText(this, "VPN permission granted! Ready to connect.", 
-                              Toast.LENGTH_SHORT).show();
-                updatePermissionStatus();
-            } else {
-                // VPN permission denied
-                Toast.makeText(this, "VPN permission denied. Cannot establish VPN connection.", 
-                              Toast.LENGTH_LONG).show();
-            }
+    private void handleVpnPermissionResult(int resultCode) {
+        if (resultCode == Activity.RESULT_OK) {
+            // VPN permission granted
+            Toast.makeText(this, "VPN permission granted! Ready to connect.", 
+                          Toast.LENGTH_SHORT).show();
+            updatePermissionStatus();
+        } else {
+            // VPN permission denied
+            Toast.makeText(this, "VPN permission denied. Cannot establish VPN connection.", 
+                          Toast.LENGTH_LONG).show();
         }
     }
     
